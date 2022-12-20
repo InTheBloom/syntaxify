@@ -8,11 +8,11 @@ int main(int argc, char *argv[]) {
 	if(argc >= 2) { // 引数から指定されたファイルを読み込む
 		fp = fopen(argv[1], "r");
 		if(fp == NULL) {
-			printf("file not exist!\n");
+			fprintf(stderr, "file not exist!\n");
 			return 0;
 		}
 	} else {
-		printf("specify a file!\n");
+		fprintf(stderr, "specify a file!\n");
 		return 0;
 	}
 
@@ -23,21 +23,44 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	int delim = -1;
+	for(int i = wordlen; 0 <= i; i--) { // ファイル区切りの記号が存在するかどうか後ろから調査する
+		if(argv[1][i] == '\\' || argv[1][i] == '/') {
+			delim = i;
+			fprintf(stdout, "delim is %i\n", delim);
+			break;
+		}
+	}
+
 	char *nf = (char *)malloc((wordlen + 5) * sizeof(char)); // 終端文字分 + .newをつける
-	nf[0] = '.';
-	nf[1] = 'n';
-	nf[2] = 'e';
-	nf[3] = 'w';
-	for(int i = 0; wordlen + 1 > i; i++) {
-		nf[4 + i] = argv[1][i];
+	if(delim != -1) { // もしファイル区切りの記号が存在するなら
+		for(int i = 0; delim >= i; i++) {
+			nf[i] = argv[1][i];
+		}
+		nf[delim + 1] = '.';
+		nf[delim + 2] = 'n';
+		nf[delim + 3] = 'e';
+		nf[delim + 4] = 'w';
+		for(int i = 0; wordlen + 1 > i; i++) {
+			nf[delim + 5 + i] = argv[1][delim + 1 + i];
+		}
+	} else {
+		nf[0] = '.';
+		nf[1] = 'n';
+		nf[2] = 'e';
+		nf[3] = 'w';
+		for(int i = 0; wordlen + 1 > i; i++) {
+			nf[4 + i] = argv[1][i];
+		}
 	}
 
 	wr = fopen(nf, "w");
 	if(wr == NULL) { // ファイルを作成できたかどうか判定
-		printf("don't include '\\' in file name!\n");
+		fprintf(stderr, "failed to make new file.\npress enter to close...\n");
+		getchar();
 		exit(EXIT_FAILURE);
 	} else {
-		printf("file opened\n");
+		fprintf(stdout, "file opened\n");
 	}
 
 	free(nf); // 新規ファイル名に使ったポインタは開放しておく
@@ -45,13 +68,17 @@ int main(int argc, char *argv[]) {
 
 	while(1) { // 注意: バイナリファイルに関してはまともに動きません。
 		unsigned char c = fgetc(fp);
-		if((char)c == EOF) {
+		if((char)c == EOF) { // EOFの定義が-1になっているのでcharにキャスト
 			break;
-		} else if(c >= 240) { // utf-8 3バイト文字として扱う(イレギュラーな奴には対応できません)
-			printf("multi byte character\n");
+		} else if(c >= 224) { // 3バイト文字
 			unsigned char c2 = fgetc(fp);
 			unsigned char c3 = fgetc(fp);
 			fprintf(wr, "%c%c%c", c, c2, c3);
+		} else if(c >= 240) { // 4バイト文字
+			unsigned char c2 = fgetc(fp);
+			unsigned char c3 = fgetc(fp);
+			unsigned char c4 = fgetc(fp);
+			fprintf(wr, "%c%c%c%c", c, c2, c3, c4);
 		} else {
 			fprintf(wr, "%c", c);
 		}
@@ -59,7 +86,8 @@ int main(int argc, char *argv[]) {
 
 	fclose(fp);
 	fclose(wr);
-	printf("successed!\n");
+	fprintf(stdout, "successed!\npress enter to close...\n");
+	getchar();
 
 	return 0;
 }
